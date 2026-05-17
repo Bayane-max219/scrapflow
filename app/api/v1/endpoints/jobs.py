@@ -16,6 +16,23 @@ from app.schemas.scraping_job import (
 router = APIRouter()
 
 
+@router.post("/{job_id}/run", status_code=status.HTTP_202_ACCEPTED)
+async def trigger_job(job_id: int, db: AsyncSession = Depends(get_db)):
+    """Manually dispatch a scraping job to Celery workers."""
+    from app.tasks.scraping_tasks import run_scraping_job
+
+    result = await db.execute(select(ScrapingJob).where(ScrapingJob.id == job_id))
+    job = result.scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status == JobStatus.RUNNING:
+        raise HTTPException(status_code=409, detail="Job is already running")
+
+    task = run_scraping_job.apply_async(args=[job_id], queue="scraping")
+    return {"job_id": job_id, "celery_task_id": task.id, "status": "queued"}
+
+
 @router.get("", response_model=PaginatedJobs)
 async def list_jobs(
     page: int = Query(1, ge=1),

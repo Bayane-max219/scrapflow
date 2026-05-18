@@ -5,8 +5,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.base import get_db
 from app.models.proxy_pool import ProxyPool
 from app.schemas.proxy_pool import ProxyCreate, ProxyResponse, ProxyUpdate
+from app.services.proxy_rotation_service import ProxyRotationService
 
 router = APIRouter()
+
+
+@router.post("/health-check", summary="Run health check on all active proxies")
+async def health_check_all(db: AsyncSession = Depends(get_db)):
+    """Tests all active proxies and updates their success_rate + response_time_ms."""
+    service = ProxyRotationService(db)
+    return await service.health_check_all()
+
+
+@router.post("/{proxy_id}/health-check", summary="Run health check on a single proxy")
+async def health_check_one(proxy_id: int, db: AsyncSession = Depends(get_db)):
+    """Tests a single proxy and updates its metrics."""
+    result = await db.execute(select(ProxyPool).where(ProxyPool.id == proxy_id))
+    proxy = result.scalar_one_or_none()
+    if proxy is None:
+        raise HTTPException(status_code=404, detail="Proxy not found")
+
+    service = ProxyRotationService(db)
+    healthy = await service.health_check(proxy)
+    return {"proxy_id": proxy_id, "healthy": healthy}
 
 
 @router.get("", response_model=list[ProxyResponse])

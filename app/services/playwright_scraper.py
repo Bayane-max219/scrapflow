@@ -1,36 +1,45 @@
 import asyncio
 import hashlib
-import random
 from typing import Any
 
-from fake_useragent import UserAgent
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
-from app.core.config import settings
-
-ua = UserAgent()
+from app.services.anti_detection import async_human_delay, generate_profile, get_playwright_init_script
 
 
 class PlaywrightScraper:
-    def __init__(self):
+    def __init__(self, mobile: bool = False) -> None:
+        self._profile = generate_profile(mobile=mobile)
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
 
-    async def _launch(self) -> None:
+    async def _launch(self, proxy: str | None = None) -> None:
         playwright = await async_playwright().start()
-        self._browser = await playwright.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"],
-        )
-        self._context = await self._browser.new_context(
-            user_agent=ua.random,
-            viewport={"width": 1366, "height": 768},
-            locale="fr-FR",
-            extra_http_headers={"Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8"},
-        )
-        await self._context.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-        )
+
+        launch_opts: dict[str, Any] = {
+            "headless": True,
+            "args": [
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-features=IsolateOrigins,site-per-process",
+            ],
+        }
+        if proxy:
+            launch_opts["proxy"] = {"server": proxy}
+
+        self._browser = await playwright.chromium.launch(**launch_opts)
+
+        context_opts: dict[str, Any] = {
+            "user_agent": self._profile.user_agent,
+            "viewport": {"width": self._profile.viewport_width, "height": self._profile.viewport_height},
+            "locale": self._profile.accept_language.split(",")[0],
+            "extra_http_headers": self._profile.extra_headers,
+            "is_mobile": self._profile.is_mobile,
+        }
+
+        self._context = await self._browser.new_context(**context_opts)
+        await self._context.add_init_script(get_playwright_init_script(self._profile))
 
     async def _close(self) -> None:
         if self._browser:
@@ -47,7 +56,7 @@ class PlaywrightScraper:
         delay_seconds: int = 2,
         proxy: str | None = None,
     ) -> list[dict[str, Any]]:
-        await self._launch()
+        await self._launch(proxy=proxy)
         results: list[dict[str, Any]] = []
 
         try:
@@ -57,7 +66,8 @@ class PlaywrightScraper:
             for page_num in range(1, max_pages + 1):
                 await page.goto(current_url, wait_until="networkidle", timeout=30_000)
 
-                await asyncio.sleep(random.uniform(delay_seconds * 0.8, delay_seconds * 1.2))
+                # Human-like delay with Gaussian noise
+                await async_human_delay(delay_seconds)
 
                 items = await self._extract_items(page, css_selector, xpath_selector)
                 for item in items:
@@ -70,6 +80,9 @@ class PlaywrightScraper:
                 if not next_url or page_num >= max_pages:
                     break
                 current_url = next_url
+
+                # Additional inter-page delay (simulate reading time)
+                await async_human_delay(delay_seconds * 0.5)
 
             await page.close()
         finally:

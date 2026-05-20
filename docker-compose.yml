@@ -1,6 +1,57 @@
 services:
+  api:
+    build: .
+    container_name: scrapflow-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scrapflow:scrapflow2026@postgres:5432/scrapflow
+      SYNC_DATABASE_URL: postgresql://scrapflow:scrapflow2026@postgres:5432/scrapflow
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SECRET_KEY: scrapflow_secret_key_bayane2026_secure_256bits!!
+      DEBUG: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: scrapflow-worker
+    command: celery -A app.tasks.celery_app worker --loglevel=info -Q scraping,beat
+    environment:
+      DATABASE_URL: postgresql+asyncpg://scrapflow:scrapflow2026@postgres:5432/scrapflow
+      SYNC_DATABASE_URL: postgresql://scrapflow:scrapflow2026@postgres:5432/scrapflow
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SECRET_KEY: scrapflow_secret_key_bayane2026_secure_256bits!!
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  beat:
+    build: .
+    container_name: scrapflow-beat
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SYNC_DATABASE_URL: postgresql://scrapflow:scrapflow2026@postgres:5432/scrapflow
+    depends_on:
+      - redis
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
+    container_name: scrapflow-db
     environment:
       POSTGRES_USER: scrapflow
       POSTGRES_PASSWORD: scrapflow2026
@@ -14,17 +65,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    container_name: scrapflow-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    restart: unless-stopped
 
   flower:
     image: mher/flower:2.0
+    container_name: scrapflow-flower
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - FLOWER_PORT=5555
@@ -32,6 +87,7 @@ services:
       - "5555:5555"
     depends_on:
       - redis
+    restart: unless-stopped
 
 volumes:
   postgres_data:

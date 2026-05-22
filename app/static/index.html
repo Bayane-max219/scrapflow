@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScrapFlow — Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+  /* Layout */
+  .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: #161b27; border-right: 1px solid #2d3748; display: flex; flex-direction: column; z-index: 100; }
+  .main { margin-left: 220px; min-height: 100vh; }
+  .topbar { background: #161b27; border-bottom: 1px solid #2d3748; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+  .content { padding: 24px; }
+
+  /* Sidebar */
+  .logo { padding: 20px 20px 16px; border-bottom: 1px solid #2d3748; }
+  .logo h1 { font-size: 18px; font-weight: 700; color: #fff; }
+  .logo span { color: #6366f1; }
+  .logo small { display: block; color: #64748b; font-size: 11px; margin-top: 2px; }
+  .nav { padding: 12px 0; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; color: #94a3b8; font-size: 14px; transition: all .15s; border-left: 3px solid transparent; }
+  .nav-item:hover { color: #e2e8f0; background: #1e2535; }
+  .nav-item.active { color: #6366f1; background: #1e2535; border-left-color: #6366f1; }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-footer { padding: 16px 20px; border-top: 1px solid #2d3748; }
+  .flower-link { display: flex; align-items: center; gap: 8px; color: #f59e0b; font-size: 13px; text-decoration: none; padding: 8px 0; }
+  .flower-link:hover { color: #fbbf24; }
+
+  /* Topbar */
+  .page-title { font-size: 18px; font-weight: 600; }
+  .status-pills { display: flex; gap: 12px; }
+  .pill { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 10px; border-radius: 999px; font-weight: 500; }
+  .pill.ok { background: #052e16; color: #4ade80; }
+  .pill.err { background: #450a0a; color: #f87171; }
+  .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.ok .pill-dot { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .card { background: #161b27; border: 1px solid #2d3748; border-radius: 12px; padding: 20px; }
+  .card-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+  .card-value { font-size: 28px; font-weight: 700; color: #fff; }
+  .card-sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+  /* Section */
+  .section { background: #161b27; border: 1px solid #2d3748; border-radius: 12px; margin-bottom: 24px; overflow: hidden; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #2d3748; }
+  .section-title { font-size: 15px; font-weight: 600; }
+  .section-body { padding: 20px; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 0 12px 12px; border-bottom: 1px solid #2d3748; }
+  td { padding: 12px; border-bottom: 1px solid #1e2535; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1a2035; }
+  .empty-row td { text-align: center; color: #64748b; padding: 32px; }
+
+  /* Status badges */
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; }
+  .badge-pending { background: #1e3a5f; color: #60a5fa; }
+  .badge-running { background: #3d2a00; color: #fbbf24; }
+  .badge-completed { background: #052e16; color: #4ade80; }
+  .badge-failed { background: #450a0a; color: #f87171; }
+  .badge-paused { background: #1e1e2e; color: #94a3b8; }
+  .badge-http { background: #1e3a5f; color: #60a5fa; }
+  .badge-socks5 { background: #2d1b69; color: #a78bfa; }
+  .badge-active { background: #052e16; color: #4ade80; }
+  .badge-disabled { background: #450a0a; color: #f87171; }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: #6366f1; color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #4f46e5; }
+  .btn-success { background: #16a34a; color: #fff; }
+  .btn-success:hover:not(:disabled) { background: #15803d; }
+  .btn-warning { background: #d97706; color: #fff; }
+  .btn-warning:hover:not(:disabled) { background: #b45309; }
+  .btn-info { background: #0891b2; color: #fff; }
+  .btn-info:hover:not(:disabled) { background: #0e7490; }
+  .btn-danger { background: #dc2626; color: #fff; }
+  .btn-danger:hover:not(:disabled) { background: #b91c1c; }
+  .btn-ghost { background: #1e2535; color: #94a3b8; }
+  .btn-ghost:hover:not(:disabled) { background: #2d3748; color: #e2e8f0; }
+  .btn-sm { padding: 4px 8px; font-size: 11px; }
+  .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* Forms */
+  .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .form-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 12px; color: #94a3b8; font-weight: 500; }
+  input, select, textarea { background: #0f1117; border: 1px solid #2d3748; border-radius: 6px; padding: 8px 12px; color: #e2e8f0; font-size: 13px; width: 100%; transition: border .15s; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #6366f1; }
+  textarea { resize: vertical; min-height: 60px; }
+  select option { background: #1e2535; }
+
+  /* Progress bar */
+  .progress-bar { height: 4px; background: #2d3748; border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #6366f1; border-radius: 2px; transition: width .3s; }
+
+  /* Toast */
+  #toasts { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 10px; }
+  .toast { background: #1e2535; border: 1px solid #2d3748; border-radius: 8px; padding: 12px 16px; font-size: 13px; min-width: 260px; display: flex; align-items: center; gap: 10px; animation: slideIn .2s ease; box-shadow: 0 4px 24px rgba(0,0,0,.4); }
+  .toast.success { border-left: 3px solid #4ade80; }
+  .toast.error { border-left: 3px solid #f87171; }
+  .toast.info { border-left: 3px solid #60a5fa; }
+  @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+
+  /* Misc */
+  .url-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #94a3b8; font-size: 11px; }
+  .task-id { font-family: monospace; font-size: 10px; color: #64748b; }
+  .refresh-badge { font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 6px; }
+  .spinner { width: 12px; height: 12px; border: 2px solid #2d3748; border-top-color: #6366f1; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .divider { height: 1px; background: #2d3748; margin: 20px 0; }
+  .text-muted { color: #64748b; font-size: 12px; }
+  .action-bar { display: flex; justify-content: flex-end; margin-top: 16px; }
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid #2d3748; margin-bottom: 20px; }
+  .tab { padding: 8px 16px; font-size: 13px; cursor: pointer; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: #6366f1; border-bottom-color: #6366f1; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+  .metric { background: #0f1117; border-radius: 6px; padding: 8px 12px; }
+  .metric-label { font-size: 10px; color: #64748b; text-transform: uppercase; }
+  .metric-value { font-size: 16px; font-weight: 700; color: #e2e8f0; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo">
+    <h1>Scrap<span>Flow</span></h1>
+    <small>Async Scraping Pipeline</small>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="showPage('dashboard')">
+      <span class="nav-icon">⚡</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('jobs')">
+      <span class="nav-icon">⚙️</span> Jobs
+    </div>
+    <div class="nav-item" onclick="showPage('proxies')">
+      <span class="nav-icon">🔀</span> Proxies
+    </div>
+    <div class="nav-item" onclick="showPage('items')">
+      <span class="nav-icon">📦</span> Scraped Items
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <a class="flower-link" href="http://localhost:5555" target="_blank">
+      🌸 Flower Monitor ↗
+    </a>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <!-- Topbar -->
+  <div class="topbar">
+    <span class="page-title" id="pageTitle">Dashboard</span>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div class="refresh-badge"><div class="spinner" id="spinner" style="display:none"></div><span id="lastRefresh">—</span></div>
+      <div class="status-pills" id="statusPills">
+        <div class="pill err"><div class="pill-dot"></div> Connecting…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- DASHBOARD PAGE -->
+    <div id="page-dashboard">
+      <div class="cards" id="statsCards">
+        <div class="card"><div class="card-label">Total Jobs</div><div class="card-value" id="statTotal">—</div><div class="card-sub">all time</div></div>
+        <div class="card"><div class="card-label">Running</div><div class="card-value" id="statRunning" style="color:#fbbf24">—</div><div class="card-sub">active now</div></div>
+        <div class="card"><div class="card-label">Completed</div><div class="card-value" id="statCompleted" style="color:#4ade80">—</div><div class="card-sub">successful</div></div>
+        <div class="card"><div class="card-label">Proxies</div><div class="card-value" id="statProxies" style="color:#a78bfa">—</div><div class="card-sub">active in pool</div></div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Recent Jobs</span>
+          <button class="btn btn-primary btn-sm" onclick="showPage('jobs')">View All →</button>
+        </div>
+        <div class="section-body" style="padding:0">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Name</th><th>Engine</th><th>Status</th><th>Last Run</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="recentJobsTable"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><span class="section-title">Proxy Pool</span></div>
+        <div class="section-body" style="padding:0">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Host:Port</th><th>Protocol</th><th>Success Rate</th><th>Resp. Time</th><th>Status</th>
+            </tr></thead>
+            <tbody id="dashProxiesTable"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- JOBS PAGE -->
+    <div id="page-jobs" style="display:none">
+      <!-- Create Job Form -->
+      <div class="section">
+        <div class="section-header"><span class="section-title">Create New Job</span></div>
+        <div class="section-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Job Name *</label>
+              <input id="jobName" type="text" placeholder="Wikipedia Scraper" />
+            </div>
+            <div class="form-group">
+              <label>Target URL *</label>
+              <input id="jobUrl" type="url" placeholder="https://example.com" />
+            </div>
+            <div class="form-group">
+              <label>Engine</label>
+              <select id="jobEngine">
+                <option value="playwright">Playwright</option>
+                <option value="selenium">Selenium</option>
+                <option value="httpx">HTTPX (fast)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>CSS Selector</label>
+              <input id="jobCss" type="text" placeholder="p, h1, .article" />
+            </div>
+            <div class="form-group">
+              <label>Max Pages</label>
+              <input id="jobMaxPages" type="number" value="1" min="1" max="100" />
+            </div>
+            <div class="form-group">
+              <label>Delay (seconds)</label>
+              <input id="jobDelay" type="number" value="2" min="0" max="60" />
+            </div>
+            <div class="form-group">
+              <label>Cron Expression (optional)</label>
+              <input id="jobCron" type="text" placeholder="* * * * * (every minute)" />
+            </div>
+          </div>
+          <div class="action-bar">
+            <button class="btn btn-primary" onclick="createJob()">+ Create Job</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Jobs Table -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">All Jobs</span>
+          <div style="display:flex;gap:8px">
+            <select id="jobStatusFilter" onchange="loadJobs()" style="font-size:12px;padding:4px 8px;width:auto">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="running">Running</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+              <option value="paused">Paused</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="loadJobs()">↺ Refresh</button>
+          </div>
+        </div>
+        <div style="padding:0">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Name</th><th>Engine</th><th>Target URL</th><th>Status</th><th>Last Run</th><th>Cron</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="jobsTable"><tr class="empty-row"><td colspan="8">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROXIES PAGE -->
+    <div id="page-proxies" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <!-- Add Proxy Form -->
+        <div class="section">
+          <div class="section-header"><span class="section-title">Add Proxy</span></div>
+          <div class="section-body">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Host *</label>
+                <input id="proxyHost" type="text" placeholder="proxy.example.com" />
+              </div>
+              <div class="form-group">
+                <label>Port *</label>
+                <input id="proxyPort" type="number" placeholder="8080" min="1" max="65535" />
+              </div>
+              <div class="form-group">
+                <label>Protocol</label>
+                <select id="proxyProtocol">
+                  <option value="http">HTTP</option>
+                  <option value="socks5">SOCKS5</option>
+                  <option value="https">HTTPS</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Username (optional)</label>
+                <input id="proxyUser" type="text" placeholder="user" />
+              </div>
+              <div class="form-group full">
+                <label>Password (optional)</label>
+                <input id="proxyPass" type="password" placeholder="••••••" />
+              </div>
+            </div>
+            <div class="action-bar">
+              <button class="btn btn-primary" onclick="addProxy()">+ Add Proxy</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Health Check -->
+        <div class="section">
+          <div class="section-header"><span class="section-title">Health Check</span></div>
+          <div class="section-body">
+            <p class="text-muted" style="margin-bottom:16px">Run a health check on all active proxies. Updates success_rate and response_time for each proxy.</p>
+            <button class="btn btn-warning" onclick="healthCheckAll()" style="width:100%;justify-content:center">
+              🔍 Run Health Check on All Proxies
+            </button>
+            <div id="healthCheckResult" style="margin-top:16px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Proxy Table -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Proxy Pool</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadProxies()">↺ Refresh</button>
+        </div>
+        <div style="padding:0">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Host</th><th>Port</th><th>Protocol</th><th>Success Rate</th><th>Resp. Time</th><th>Status</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="proxiesTable"><tr class="empty-row"><td colspan="8">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ITEMS PAGE -->
+    <div id="page-items" style="display:none">
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Scraped Items</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="text-muted" id="itemsTotal"></span>
+            <button class="btn btn-ghost btn-sm" onclick="loadItems()">↺ Refresh</button>
+          </div>
+        </div>
+        <div style="padding:0">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Job ID</th><th>URL</th><th>Status</th><th>Data Preview</th><th>Scraped At</th>
+            </tr></thead>
+            <tbody id="itemsTable"><tr class="empty-row"><td colspan="6">No items yet — run a job first</td></tr></tbody>
+          </table>
+        </div>
+        <div style="padding:16px;display:flex;justify-content:center;gap:8px" id="itemsPagination"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toasts -->
+<div id="toasts"></div>
+
+<script>
+const API = 'http://localhost:8002/api/v1';
+let currentPage = 'dashboard';
+let itemsPage = 1;
+let refreshTimer = null;
+
+// ─── Navigation ───
+function showPage(page) {
+  document.querySelectorAll('[id^="page-"]').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + page).style.display = '';
+  document.querySelectorAll('.nav-item').forEach(el => {
+    if(el.textContent.trim().toLowerCase().includes(page === 'dashboard' ? 'dashboard' : page === 'jobs' ? 'jobs' : page === 'proxies' ? 'proxies' : 'scraped')) {
+      el.classList.add('active');
+    }
+  });
+  const titles = { dashboard: 'Dashboard', jobs: 'Scraping Jobs', proxies: 'Proxy Pool', items: 'Scraped Items' };
+  document.getElementById('pageTitle').textContent = titles[page];
+  currentPage = page;
+  refreshPage();
+}
+
+// ─── Auto-refresh ───
+function startRefresh() {
+  if(refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshPage, 5000);
+}
+
+function refreshPage() {
+  checkHealth();
+  if(currentPage === 'dashboard') { loadStats(); loadRecentJobs(); loadDashProxies(); }
+  else if(currentPage === 'jobs') loadJobs();
+  else if(currentPage === 'proxies') loadProxies();
+  else if(currentPage === 'items') loadItems();
+  document.getElementById('lastRefresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ─── API helpers ───
+async function api(method, path, body) {
+  const spinner = document.getElementById('spinner');
+  spinner.style.display = '';
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if(body) opts.body = JSON.stringify(body);
+    const res = await fetch(API + path, opts);
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(data.detail || res.statusText);
+    return data;
+  } finally {
+    spinner.style.display = 'none';
+  }
+}
+
+// ─── Health ───
+async function checkHealth() {
+  try {
+    const h = await api('GET', '/health');
+    const pills = document.getElementById('statusPills');
+    pills.innerHTML = `
+      <div class="pill ok"><div class="pill-dot"></div> API OK</div>
+      <div class="pill ${h.database==='connected'?'ok':'err'}"><div class="pill-dot"></div> DB ${h.database}</div>
+      <div class="pill ${h.redis==='connected'?'ok':'err'}"><div class="pill-dot"></div> Redis ${h.redis}</div>
+    `;
+  } catch(e) {
+    document.getElementById('statusPills').innerHTML = '<div class="pill err"><div class="pill-dot"></div> API Down</div>';
+  }
+}
+
+// ─── Stats ───
+async function loadStats() {
+  try {
+    const jobs = await api('GET', '/jobs?page_size=100');
+    const statuses = {};
+    (jobs.items || []).forEach(j => { statuses[j.status] = (statuses[j.status]||0)+1; });
+    document.getElementById('statTotal').textContent = jobs.total ?? '—';
+    document.getElementById('statRunning').textContent = statuses.running ?? 0;
+    document.getElementById('statCompleted').textContent = statuses.completed ?? 0;
+    const proxies = await api('GET', '/proxies');
+    document.getElementById('statProxies').textContent = proxies.length ?? '—';
+  } catch(e) {}
+}
+
+// ─── Badge ───
+function badge(status) {
+  const dot = `<div class="badge-dot"></div>`;
+  const cls = `badge badge-${status}`;
+  return `<span class="${cls}">${dot}${status}</span>`;
+}
+
+function protoBadge(proto) {
+  return `<span class="badge badge-${proto}">${proto}</span>`;
+}
+
+function fmtDate(d) {
+  if(!d) return '<span class="text-muted">—</span>';
+  return new Date(d).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+function actionBtns(job) {
+  const canRun = ['pending','failed','completed'].includes(job.status);
+  const canPause = ['pending','running'].includes(job.status);
+  const canResume = job.status === 'paused';
+  return `
+    <div class="btn-group">
+      <button class="btn btn-success btn-sm" ${canRun?'':'disabled'} onclick="runJob(${job.id})">▶ Run</button>
+      <button class="btn btn-warning btn-sm" ${canPause?'':'disabled'} onclick="pauseJob(${job.id})">⏸ Pause</button>
+      <button class="btn btn-info btn-sm" ${canResume?'':'disabled'} onclick="resumeJob(${job.id})">▶ Resume</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteJob(${job.id})">🗑</button>
+    </div>
+  `;
+}
+
+// ─── Recent Jobs (dashboard) ───
+async function loadRecentJobs() {
+  try {
+    const data = await api('GET', '/jobs?page_size=5');
+    const jobs = data.items || [];
+    const tbody = document.getElementById('recentJobsTable');
+    if(!jobs.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No jobs yet</td></tr>'; return; }
+    tbody.innerHTML = jobs.map(j => `
+      <tr>
+        <td>#${j.id}</td>
+        <td><strong>${j.name}</strong></td>
+        <td>${protoBadge(j.engine)}</td>
+        <td>${badge(j.status)}</td>
+        <td>${fmtDate(j.last_run_at)}</td>
+        <td>${actionBtns(j)}</td>
+      </tr>
+    `).join('');
+  } catch(e) {}
+}
+
+// ─── Dashboard Proxies ───
+async function loadDashProxies() {
+  try {
+    const proxies = await api('GET', '/proxies');
+    const tbody = document.getElementById('dashProxiesTable');
+    if(!proxies.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No proxies configured</td></tr>'; return; }
+    tbody.innerHTML = proxies.map(p => `
+      <tr>
+        <td>#${p.id}</td>
+        <td><code style="font-size:12px">${p.host}</code></td>
+        <td>${protoBadge(p.protocol)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress-bar" style="width:80px"><div class="progress-fill" style="width:${(p.success_rate*100).toFixed(0)}%;background:${p.success_rate>0.7?'#4ade80':p.success_rate>0.3?'#fbbf24':'#f87171'}"></div></div>
+            <span>${(p.success_rate*100).toFixed(0)}%</span>
+          </div>
+        </td>
+        <td>${p.response_time_ms ? p.response_time_ms + 'ms' : '—'}</td>
+        <td>${p.is_active ? '<span class="badge badge-active"><div class="badge-dot"></div>active</span>' : '<span class="badge badge-disabled"><div class="badge-dot"></div>disabled</span>'}</td>
+      </tr>
+    `).join('');
+  } catch(e) {}
+}
+
+// ─── Jobs ───
+async function loadJobs() {
+  try {
+    const filter = document.getElementById('jobStatusFilter').value;
+    const url = '/jobs?page_size=50' + (filter ? '&status='+filter : '');
+    const data = await api('GET', url);
+    const jobs = data.items || [];
+    const tbody = document.getElementById('jobsTable');
+    if(!jobs.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No jobs found</td></tr>'; return; }
+    tbody.innerHTML = jobs.map(j => `
+      <tr>
+        <td>#${j.id}</td>
+        <td><strong>${j.name}</strong></td>
+        <td>${protoBadge(j.engine)}</td>
+        <td class="url-cell" title="${j.target_url}">${j.target_url}</td>
+        <td>${badge(j.status)}</td>
+        <td>${fmtDate(j.last_run_at)}</td>
+        <td>${j.cron_expression ? `<code style="font-size:10px;color:#a78bfa">${j.cron_expression}</code>` : '<span class="text-muted">—</span>'}</td>
+        <td>${actionBtns(j)}</td>
+      </tr>
+    `).join('');
+  } catch(e) { toast('error', 'Failed to load jobs'); }
+}
+
+async function createJob() {
+  const name = document.getElementById('jobName').value.trim();
+  const url = document.getElementById('jobUrl').value.trim();
+  if(!name || !url) { toast('error', 'Name and URL are required'); return; }
+  try {
+    const j = await api('POST', '/jobs', {
+      name, target_url: url,
+      engine: document.getElementById('jobEngine').value,
+      css_selector: document.getElementById('jobCss').value || null,
+      max_pages: parseInt(document.getElementById('jobMaxPages').value),
+      delay_seconds: parseInt(document.getElementById('jobDelay').value),
+      cron_expression: document.getElementById('jobCron').value || null,
+    });
+    toast('success', `Job #${j.id} "${j.name}" created`);
+    document.getElementById('jobName').value = '';
+    document.getElementById('jobUrl').value = '';
+    document.getElementById('jobCss').value = '';
+    document.getElementById('jobCron').value = '';
+    loadJobs();
+  } catch(e) { toast('error', e.message); }
+}
+
+async function runJob(id) {
+  try {
+    const r = await api('POST', `/jobs/${id}/run`);
+    toast('success', `Job #${id} queued → task ${r.celery_task_id.slice(0,8)}…`);
+    setTimeout(loadJobs, 1000);
+    setTimeout(loadJobs, 4000);
+  } catch(e) { toast('error', e.message); }
+}
+
+async function pauseJob(id) {
+  try {
+    await api('PATCH', `/jobs/${id}/pause`);
+    toast('info', `Job #${id} paused`);
+    loadJobs(); if(currentPage==='dashboard') loadRecentJobs();
+  } catch(e) { toast('error', e.message); }
+}
+
+async function resumeJob(id) {
+  try {
+    await api('PATCH', `/jobs/${id}/resume`);
+    toast('success', `Job #${id} resumed`);
+    loadJobs(); if(currentPage==='dashboard') loadRecentJobs();
+  } catch(e) { toast('error', e.message); }
+}
+
+async function deleteJob(id) {
+  if(!confirm(`Delete job #${id}?`)) return;
+  try {
+    await api('DELETE', `/jobs/${id}`);
+    toast('success', `Job #${id} deleted`);
+    loadJobs(); loadStats();
+  } catch(e) { toast('error', e.message); }
+}
+
+// ─── Proxies ───
+async function loadProxies() {
+  try {
+    const proxies = await api('GET', '/proxies?active_only=false');
+    const tbody = document.getElementById('proxiesTable');
+    if(!proxies.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No proxies yet</td></tr>'; return; }
+    tbody.innerHTML = proxies.map(p => `
+      <tr>
+        <td>#${p.id}</td>
+        <td><code style="font-size:12px">${p.host}</code></td>
+        <td>${p.port}</td>
+        <td>${protoBadge(p.protocol)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="progress-bar" style="width:60px"><div class="progress-fill" style="width:${(p.success_rate*100).toFixed(0)}%;background:${p.success_rate>0.7?'#4ade80':p.success_rate>0.3?'#fbbf24':'#f87171'}"></div></div>
+            <span style="font-size:12px">${(p.success_rate*100).toFixed(0)}%</span>
+          </div>
+        </td>
+        <td>${p.response_time_ms ? p.response_time_ms + 'ms' : '<span class="text-muted">—</span>'}</td>
+        <td>${p.is_active ? '<span class="badge badge-active"><div class="badge-dot"></div>active</span>' : '<span class="badge badge-disabled"><div class="badge-dot"></div>disabled</span>'}</td>
+        <td>
+          <div class="btn-group">
+            <button class="btn btn-info btn-sm" onclick="healthCheckOne(${p.id})">🔍 Test</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteProxy(${p.id})">🗑</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) {}
+}
+
+async function addProxy() {
+  const host = document.getElementById('proxyHost').value.trim();
+  const port = parseInt(document.getElementById('proxyPort').value);
+  if(!host || !port) { toast('error', 'Host and port are required'); return; }
+  try {
+    const p = await api('POST', '/proxies', {
+      host, port,
+      protocol: document.getElementById('proxyProtocol').value,
+      username: document.getElementById('proxyUser').value || null,
+      password: document.getElementById('proxyPass').value || null,
+    });
+    toast('success', `Proxy #${p.id} ${p.host}:${p.port} added`);
+    document.getElementById('proxyHost').value = '';
+    document.getElementById('proxyPort').value = '';
+    document.getElementById('proxyUser').value = '';
+    document.getElementById('proxyPass').value = '';
+    loadProxies();
+  } catch(e) { toast('error', e.message); }
+}
+
+async function healthCheckAll() {
+  toast('info', 'Running health check on all proxies…');
+  try {
+    const r = await api('POST', '/proxies/health-check');
+    const el = document.getElementById('healthCheckResult');
+    el.innerHTML = `
+      <div class="metrics">
+        <div class="metric"><div class="metric-label">Total</div><div class="metric-value">${r.total}</div></div>
+        <div class="metric"><div class="metric-label" style="color:#4ade80">Healthy</div><div class="metric-value" style="color:#4ade80">${r.healthy}</div></div>
+        <div class="metric"><div class="metric-label" style="color:#f87171">Failed</div><div class="metric-value" style="color:#f87171">${r.failed}</div></div>
+      </div>
+    `;
+    toast('success', `Health check done — ${r.healthy}/${r.total} healthy`);
+    loadProxies();
+  } catch(e) { toast('error', e.message); }
+}
+
+async function healthCheckOne(id) {
+  try {
+    const r = await api('POST', `/proxies/${id}/health-check`);
+    toast(r.healthy ? 'success' : 'error', `Proxy #${id} → ${r.healthy ? '✅ Healthy' : '❌ Failed'}`);
+    loadProxies();
+  } catch(e) { toast('error', e.message); }
+}
+
+async function deleteProxy(id) {
+  if(!confirm(`Delete proxy #${id}?`)) return;
+  try {
+    await api('DELETE', `/proxies/${id}`);
+    toast('success', `Proxy #${id} deleted`);
+    loadProxies();
+  } catch(e) { toast('error', e.message); }
+}
+
+// ─── Items ───
+async function loadItems() {
+  try {
+    const data = await api('GET', `/items?page=${itemsPage}&page_size=20`);
+    const items = data.items || [];
+    document.getElementById('itemsTotal').textContent = `${data.total} items — page ${data.page}/${data.pages}`;
+    const tbody = document.getElementById('itemsTable');
+    if(!items.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No scraped items yet — run a job to scrape data</td></tr>';
+    } else {
+      tbody.innerHTML = items.map(i => `
+        <tr>
+          <td>#${i.id}</td>
+          <td>#${i.job_id}</td>
+          <td class="url-cell" title="${i.url}">${i.url}</td>
+          <td>${badge(i.status)}</td>
+          <td><code style="font-size:10px;color:#94a3b8">${JSON.stringify(i.data).slice(0,60)}…</code></td>
+          <td>${fmtDate(i.scraped_at)}</td>
+        </tr>
+      `).join('');
+    }
+    // Pagination
+    const pag = document.getElementById('itemsPagination');
+    if(data.pages > 1) {
+      pag.innerHTML = `
+        <button class="btn btn-ghost btn-sm" ${itemsPage<=1?'disabled':''} onclick="itemsPage--;loadItems()">← Prev</button>
+        <span class="text-muted">Page ${data.page} / ${data.pages}</span>
+        <button class="btn btn-ghost btn-sm" ${itemsPage>=data.pages?'disabled':''} onclick="itemsPage++;loadItems()">Next →</button>
+      `;
+    } else { pag.innerHTML = ''; }
+  } catch(e) {}
+}
+
+// ─── Toast ───
+function toast(type, msg) {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ─── Init ───
+checkHealth();
+loadStats();
+loadRecentJobs();
+loadDashProxies();
+startRefresh();
+</script>
+</body>
+</html>

@@ -1,9 +1,11 @@
+import asyncio
 import logging
 from typing import Any
 
 from app.models.scraping_job import ScraperEngine
 from app.services.playwright_scraper import PlaywrightScraper
 from app.services.selenium_scraper import SeleniumScraper
+from app.services.httpx_scraper import HttpxScraper
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,14 @@ class ScraperDispatcher:
         Returns (items, engine_used).
         Falls back to Selenium if Playwright raises an exception.
         """
+        if engine == ScraperEngine.HTTPX:
+            logger.info("Starting HTTPX scraper for %s", url)
+            items = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: HttpxScraper().scrape(url, css_selector, xpath_selector, max_pages, delay_seconds, proxy),
+            )
+            return items, "httpx"
+
         if engine == ScraperEngine.PLAYWRIGHT:
             try:
                 logger.info("Starting Playwright scraper for %s", url)

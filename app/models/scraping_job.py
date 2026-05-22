@@ -28,10 +28,10 @@ class ScrapingJob(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     target_url: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[JobStatus] = mapped_column(
-        Enum(JobStatus), default=JobStatus.PENDING, nullable=False
+        Enum(JobStatus, values_callable=lambda x: [e.value for e in x]), default=JobStatus.PENDING, nullable=False
     )
     engine: Mapped[ScraperEngine] = mapped_column(
-        Enum(ScraperEngine), default=ScraperEngine.PLAYWRIGHT, nullable=False
+        Enum(ScraperEngine, values_callable=lambda x: [e.value for e in x]), default=ScraperEngine.PLAYWRIGHT, nullable=False
     )
     css_selector: Mapped[str | None] = mapped_column(Text, nullable=True)
     xpath_selector: Mapped[str | None] = mapped_column(Text, nullable=True)

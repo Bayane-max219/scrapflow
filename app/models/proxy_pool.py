@@ -19,7 +19,7 @@ class ProxyPool(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     host: Mapped[str] = mapped_column(String(255), nullable=False)
     port: Mapped[int] = mapped_column(Integer, nullable=False)
-    protocol: Mapped[ProxyProtocol] = mapped_column(Enum(ProxyProtocol), default=ProxyProtocol.HTTP)
+    protocol: Mapped[ProxyProtocol] = mapped_column(Enum(ProxyProtocol, values_callable=lambda x: [e.value for e in x]), default=ProxyProtocol.HTTP)
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

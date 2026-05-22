@@ -3,7 +3,7 @@ services:
     build: .
     container_name: scrapflow-api
     ports:
-      - "8000:8000"
+      - "8002:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://scrapflow:scrapflow2026@postgres:5432/scrapflow
       SYNC_DATABASE_URL: postgresql://scrapflow:scrapflow2026@postgres:5432/scrapflow
@@ -57,7 +57,7 @@ services:
       POSTGRES_PASSWORD: scrapflow2026
       POSTGRES_DB: scrapflow
     ports:
-      - "5432:5432"
+      - "5436:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
